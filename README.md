@@ -1,6 +1,8 @@
 
 #EG Prompt Builder – Full System Guide CyberRealistic Pony / Stability Matrix#
 
+(see comments in eg_prompt_builder.py for setup info)
+
 This project generates stable, SFW, show-accurate Equestria Girls prompts using CSV-driven characters and templates.
 
 It supports:
