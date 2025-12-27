@@ -1,5 +1,6 @@
 
 #EG Prompt Builder – Full System Guide CyberRealistic Pony / Stability Matrix#
+V 1.4.0
 
 (see comments in eg_prompt_builder.py for setup info)
 
