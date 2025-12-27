@@ -1,6 +1,8 @@
 
 # EG Prompt Builder – Full System Guide CyberRealistic Pony / Stability Matrix #
-V 1.4.0
+V 1.5.0
+
+Added eye color
 
 (see comments in eg_prompt_builder.py for setup info)
 
@@ -43,7 +45,7 @@ Templates
 
 **The character CSV MUST use this exact header:**
 
-Character,Age_Group,Gender,Hair_Block,Casual_Outfit_Block,Pajamas_Block,Camp_Everfree_Outfit_Block
+Character,Age_Group,Gender,Eye_Color,Hair_Block,Casual_Outfit_Block,Pajamas_Block,Camp_Everfree_Outfit_Block
 
 Age_Group values
 
