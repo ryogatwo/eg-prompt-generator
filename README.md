@@ -1,5 +1,5 @@
 
-#EG Prompt Builder – Full System Guide CyberRealistic Pony / Stability Matrix#
+# EG Prompt Builder – Full System Guide CyberRealistic Pony / Stability Matrix #
 V 1.4.0
 
 (see comments in eg_prompt_builder.py for setup info)
@@ -17,7 +17,7 @@ It supports:
     	Students + adult staff
     	Automatic age and gender injection
 
-##1	Required Files##
+## 1	Required Files ##
 
 
 **Place all files in the SAME folder:**
@@ -39,7 +39,7 @@ Templates
     ultra_minimal_bulletproof_eg_template_winter.csv
     ultra_minimal_bulletproof_eg_template_camp_everfree.csv (optional but recommended)
 
-##2	Character CSV Format (IMPORTANT)##
+## 2	Character CSV Format (IMPORTANT) ##
 
 **The character CSV MUST use this exact header:**
 
@@ -64,7 +64,7 @@ These are automatically injected into prompts as:
 
 This prevents model aging drift and keeps outputs safe.
 
-##3	Template Placeholders##
+## 3	Template Placeholders ##
 
 Templates may include:
 
@@ -76,13 +76,13 @@ Templates may include:
 
 You do NOT need a demographics placeholder. Age and gender are injected automatically by the script.
 
-##4	Running the Script##
+## 4	Running the Script ##
 
 From the same folder, run:
 
 `python eg_prompt_builder.py`
 
-##5	Interactive Menus Explained##
+## 5	Interactive Menus Explained ##
 
 **Character Selection (applies to ALL modes)**
 
@@ -124,7 +124,7 @@ Random groups and manual groups will ONLY use the selected scope.
     
     	Optional random groups
 
-##6	Outputs##
+## 6	Outputs ##
 
 **TXT Files** 
 
@@ -163,7 +163,7 @@ Columns include:
 
 This is ideal for batch runs or external tools.
 
-##7	Stability Matrix Settings (CyberRealistic Pony)##
+## 7	Stability Matrix Settings (CyberRealistic Pony) ##
 
 **Recommended Base Settings**
 
@@ -186,20 +186,20 @@ Troubleshooting
     	Bad hands -> generate more seeds, do not raise CFG
     	Identity bleed -> reduce group size (2-3 max)
 
-##8	Camp Everfree and Staff Notes##
+## 8	Camp Everfree and Staff Notes ##
     
     	Camp Everfree attire is supported per-character
     	Adult staff are tagged as adult man / adult woman
     	Staff outfits are modest and non-student by design
 
-##9	Safety Notes##
+## 9	Safety Notes ##
 
     	This system is SFW by construction
     	Age tags are explicit
     	No sexualized language should be added
     	Keep templates clean and minimal
 
-##10	Summary##
+## 10	Summary ##
 
 **This system is:**
 
