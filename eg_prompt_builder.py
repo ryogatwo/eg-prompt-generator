@@ -7,10 +7,11 @@ CyberRealistic Pony prompt assembler for singles + groups, CSV-driven.
 VERSIONING
 ===============================================================================
 Script Name: eg_prompt_builder.py
-Version:     1.4.0
-Last Change: 2025-12-26
+Version:     1.5.0
+Last Change: 2025-12-27
 
 Changelog
+- 1.5.0  Added Eye_Color column support and auto-injection into prompts
 - 1.4.0  Added Demographics Injection (Age_Group + Gender) into prompts
 - 1.3.0  Added Explicit Character Selection (All / One / Multiple) for entire run
 - 1.2.0  Added Outfit Force Toggle (Auto / Casual / Pajamas / Camp Everfree)
@@ -22,113 +23,46 @@ If you change logic or CSV schema, bump Version and add a changelog line.
 
 
 ===============================================================================
-STEP-BY-STEP SETUP (READ THIS ONCE, SAVE FUTURE YOU)
+STEP-BY-STEP SETUP
 ===============================================================================
 
 STEP 1) Put these files in ONE folder
-- eg_prompt_builder.py   (this script)
-- equestria_girls_reference.csv   (character data)
+- eg_prompt_builder.py
+- equestria_girls_reference.csv
 - ultra_minimal_bulletproof_eg_template_sleep.csv
 - ultra_minimal_bulletproof_eg_template_daytime.csv
 - ultra_minimal_bulletproof_eg_template_classroom.csv
 - ultra_minimal_bulletproof_eg_template_outdoor.csv
 - ultra_minimal_bulletproof_eg_template_winter.csv
 - optional: ultra_minimal_bulletproof_eg_template_camp_everfree.csv
-  (or any template filename containing "camp" or "everfree" will be treated as camp)
 
-STEP 2) Make sure Python works
-- Install Python 3.9+ (3.10+ recommended)
-- No extra packages required (uses only standard library)
+STEP 2) Confirm Python works
+- Python 3.9+ (3.10+ recommended)
+- No extra packages required (standard library only)
 
-STEP 3) Confirm your Character CSV header is EXACT
-Your equestria_girls_reference.csv MUST have this header line exactly:
-
-Character,Age_Group,Gender,Hair_Block,Casual_Outfit_Block,Pajamas_Block,Camp_Everfree_Outfit_Block
+STEP 3) Confirm Character CSV header is EXACT
+Character,Age_Group,Gender,Eye_Color,Hair_Block,Casual_Outfit_Block,Pajamas_Block,Camp_Everfree_Outfit_Block
 
 Allowed values:
 - Age_Group: child | teen | adult
 - Gender:    female | male
+- Eye_Color: simple color words like blue, green, purple, teal, amber, brown, etc.
 
 Notes:
-- Age/Gender are injected into prompts automatically (you do NOT need template placeholders).
-- Keep character names consistent, you must type them exactly for manual groups.
+- Age/Gender/Eye color are injected automatically (no template placeholders needed).
 
-STEP 4) Confirm your Template CSV header is EXACT
-Each template CSV must have:
-
+STEP 4) Confirm Template CSV header is EXACT
 Section,Content
 
-Each row is a section name and its content. Content can include placeholders:
+Template placeholders (optional):
 - [CHARACTER NAME]
 - [PASTE HAIR BLOCK HERE]
 - [PASTE CASUAL OUTFIT BLOCK HERE]
 - [PASTE PAJAMAS BLOCK HERE]
 - [PASTE CAMP EVERFREE OUTFIT BLOCK HERE]
 
-You do NOT need a demographics placeholder.
-The script injects a "Demographics" section automatically.
-
-STEP 5) Run the script
-From that folder:
-
+STEP 5) Run
 python eg_prompt_builder.py
-
-STEP 6) Answer the prompts (the script is interactive)
-You will be asked for:
-- Character CSV path (Enter = default)
-- Template CSV list (Enter = default list)
-- Output folder name (Enter = out_prompts)
-- Combined CSV filename (Enter = assembled_prompts.csv)
-
-Then two important run-wide toggles:
-A) Character selection scope (applies to all outputs this run)
-   1) All characters
-   2) One character
-   3) Multiple characters
-
-B) Outfit mode (applies to all outputs this run)
-   a) Auto (sleep -> pajamas, camp -> camp attire, else -> casual)
-   c) Force Casual
-   p) Force Pajamas
-   e) Force Camp Everfree
-
-Finally, choose a generation mode:
-1) Singles (every in-scope character x every template)
-2) Manual group (you type the names, must be in-scope)
-3) Random groups (random samples from in-scope)
-4) Generate everything (singles + optional manual + optional random)
-
-STEP 7) Check outputs
-You will get:
-- TXT files in your output folder (default out_prompts/)
-- A combined CSV inside that output folder
-
-TXT format:
-MAIN PROMPT:
-...
-NEGATIVE PROMPT:
-...
-SETTINGS:
-...
-
-Combined CSV columns:
-Mode, Character_Scope, Forced_Outfit_Mode, Resolved_Outfit_Mode, Group_Name, Character,
-Template_Kind, Template_File, Main_Prompt, Negative_Prompt, Settings, Output_File
-
-STEP 8) Troubleshooting
-- "Character CSV missing columns": Header does not match EXACTLY.
-- "Template CSV missing columns": Template header must be Section,Content.
-- "Not found in selected character scope": You typed a name not present in the CSV OR not included by scope.
-- Double heads: lower CFG slightly, keep prompts minimal, avoid conflicting descriptors.
-- Bad hands: keep the "Hands" section simple, do more seeds, don't crank CFG.
-
-===============================================================================
-SAFETY + CONSISTENCY NOTES
-===============================================================================
-- This system is designed for SFW prompt generation.
-- Age tags prevent unwanted "aging drift" by making age explicit.
-- For child characters, keep outfits modest and non-suggestive.
-- For group shots, keep group sizes small for best identity stability (2-3 ideal).
 
 ===============================================================================
 """
@@ -142,8 +76,6 @@ from dataclasses import dataclass
 from typing import Dict, List, Tuple
 
 
-# Placeholders used inside template CSV files.
-# Templates can use any/all of these, but the script will also run if some are absent.
 PLACEHOLDERS = {
     "name": "[CHARACTER NAME]",
     "hair": "[PASTE HAIR BLOCK HERE]",
@@ -155,10 +87,10 @@ PLACEHOLDERS = {
 
 @dataclass
 class CharacterRow:
-    """One character entry from equestria_girls_reference.csv"""
     character: str
     age_group: str  # child / teen / adult
     gender: str     # female / male
+    eye_color: str  # e.g. blue, green, purple, teal, amber, brown
     hair: str
     casual: str
     pajamas: str
@@ -169,17 +101,13 @@ class CharacterRow:
 # CSV IO
 # -----------------------------
 def read_characters_csv(path: str) -> List[CharacterRow]:
-    """
-    Reads the character reference CSV.
-    REQUIRED HEADERS:
-      Character, Age_Group, Gender, Hair_Block, Casual_Outfit_Block, Pajamas_Block, Camp_Everfree_Outfit_Block
-    """
     with open(path, "r", newline="", encoding="utf-8") as f:
         reader = csv.DictReader(f)
         required = {
             "Character",
             "Age_Group",
             "Gender",
+            "Eye_Color",
             "Hair_Block",
             "Casual_Outfit_Block",
             "Pajamas_Block",
@@ -198,6 +126,7 @@ def read_characters_csv(path: str) -> List[CharacterRow]:
                 character=name,
                 age_group=(r.get("Age_Group") or "").strip().lower(),
                 gender=(r.get("Gender") or "").strip().lower(),
+                eye_color=(r.get("Eye_Color") or "").strip().lower(),
                 hair=(r.get("Hair_Block") or "").strip(),
                 casual=(r.get("Casual_Outfit_Block") or "").strip(),
                 pajamas=(r.get("Pajamas_Block") or "").strip(),
@@ -207,11 +136,6 @@ def read_characters_csv(path: str) -> List[CharacterRow]:
 
 
 def read_template_csv(path: str) -> List[Tuple[str, str]]:
-    """
-    Reads a template CSV.
-    REQUIRED HEADERS:
-      Section, Content
-    """
     with open(path, "r", newline="", encoding="utf-8") as f:
         reader = csv.DictReader(f)
         required = {"Section", "Content"}
@@ -232,7 +156,6 @@ def read_template_csv(path: str) -> List[Tuple[str, str]]:
 # Helpers
 # -----------------------------
 def slugify(s: str) -> str:
-    """Converts a string into a safe filename slug."""
     s = s.strip().lower()
     s = re.sub(r"[^\w\s-]+", "", s)
     s = re.sub(r"[\s_-]+", "_", s)
@@ -240,17 +163,6 @@ def slugify(s: str) -> str:
 
 
 def template_kind_from_filename(path: str) -> str:
-    """
-    Infers template kind from filename.
-    Used for AUTO outfit mode.
-    Convention:
-      * contains classroom -> classroom
-      * contains daytime   -> daytime
-      * contains outdoor   -> outdoor
-      * contains winter    -> winter
-      * contains camp/everfree -> camp
-      * otherwise -> sleep
-    """
     base = os.path.basename(path).lower()
     if "classroom" in base:
         return "classroom"
@@ -266,13 +178,11 @@ def template_kind_from_filename(path: str) -> str:
 
 
 def parse_list(s: str) -> List[str]:
-    """Parses comma- or semicolon-separated lists."""
     parts = re.split(r"[;,]", s)
     return [p.strip() for p in parts if p.strip()]
 
 
 def build_lookup(rows: List[CharacterRow]) -> Dict[str, CharacterRow]:
-    """Case-insensitive lookup for Character names."""
     return {r.character.lower(): r for r in rows}
 
 
@@ -280,14 +190,6 @@ def build_lookup(rows: List[CharacterRow]) -> Dict[str, CharacterRow]:
 # Character scope selection
 # -----------------------------
 def prompt_character_scope(rows_all: List[CharacterRow]) -> List[CharacterRow]:
-    """
-    Lets the user choose which characters are "in scope" for this run.
-    This affects:
-      - singles
-      - manual groups (must choose from scope)
-      - random groups (only draw from scope)
-      - generate everything
-    """
     print("\nCharacter selection (applies to ALL modes this run):")
     print("  1) All characters")
     print("  2) Select ONE character")
@@ -328,10 +230,6 @@ def prompt_character_scope(rows_all: List[CharacterRow]) -> List[CharacterRow]:
 # Outfit mode toggle
 # -----------------------------
 def prompt_outfit_force() -> str:
-    """
-    Global outfit mode toggle for this run.
-    Returns: 'auto' | 'casual' | 'pajamas' | 'camp'
-    """
     print("\nOutfit mode (applies to ALL outputs this run):")
     print("  a) Auto (by template type: sleep=pajamas, camp=camp, else casual)")
     print("  c) Force Casual outfits")
@@ -350,7 +248,6 @@ def prompt_outfit_force() -> str:
 
 
 def resolve_outfit_mode(kind: str, forced_mode: str) -> str:
-    """If user forces a mode, use it. Otherwise use auto per template kind."""
     if forced_mode in ("casual", "pajamas", "camp"):
         return forced_mode
     if kind == "sleep":
@@ -361,7 +258,6 @@ def resolve_outfit_mode(kind: str, forced_mode: str) -> str:
 
 
 def outfit_block_for(c: CharacterRow, outfit_mode: str) -> str:
-    """Returns the correct outfit block string for a character row."""
     if outfit_mode == "pajamas":
         return c.pajamas
     if outfit_mode == "camp":
@@ -370,13 +266,9 @@ def outfit_block_for(c: CharacterRow, outfit_mode: str) -> str:
 
 
 # -----------------------------
-# Demographics injection
+# Demographics + eye color injection
 # -----------------------------
 def demographics_tags(age_group: str, gender: str) -> str:
-    """
-    Converts Age_Group + Gender into stable, Pony-friendly prompt tags.
-    This is intentionally simple to prevent unwanted drift.
-    """
     age_group = (age_group or "").strip().lower()
     gender = (gender or "").strip().lower()
 
@@ -401,11 +293,21 @@ def demographics_tags(age_group: str, gender: str) -> str:
     return f"{age}, {gen}"
 
 
+def eye_color_tags(eye_color: str) -> str:
+    """
+    Keep eye color tags simple and model-friendly.
+    Example: 'blue' -> 'blue eyes'
+    """
+    c = (eye_color or "").strip().lower()
+    if not c:
+        return "eyes"
+    return f"{c} eyes"
+
+
 # -----------------------------
 # Group pose helper
 # -----------------------------
 def group_pose_hint(kind: str, n: int) -> str:
-    """Minimal group-shot framing hint."""
     if kind == "classroom":
         return f"group shot, {n} students, sitting at desks, simple composition"
     if kind == "sleep":
@@ -426,12 +328,6 @@ def assemble_single(
     kind: str,
     forced_mode: str,
 ) -> Dict[str, str]:
-    """
-    Assemble a single-character prompt dict.
-    - Replaces placeholders where present
-    - Injects demographics regardless of template placeholders
-    - Applies outfit mode (auto/forced)
-    """
     outfit_mode = resolve_outfit_mode(kind, forced_mode)
     assembled: Dict[str, str] = {}
 
@@ -443,14 +339,13 @@ def assemble_single(
         out = out.replace(PLACEHOLDERS["pajamas"], c.pajamas)
         out = out.replace(PLACEHOLDERS["camp"], c.camp)
 
-        # Clothing fallback injection if the template's Clothing content is blank
         if sec.lower() == "clothing" and not out.strip():
             out = outfit_block_for(c, outfit_mode)
 
         assembled[sec] = out
 
-    # Demographics is injected even if your template CSV has no "Demographics" section
     assembled["Demographics"] = demographics_tags(c.age_group, c.gender)
+    assembled["Eye_Color_Tags"] = eye_color_tags(c.eye_color)
     return assembled
 
 
@@ -460,12 +355,6 @@ def assemble_group(
     kind: str,
     forced_mode: str,
 ) -> Dict[str, str]:
-    """
-    Assemble a group prompt dict.
-    - Uses a combined identity string
-    - Builds per-character hair+outfit identity block to reduce identity bleed
-    - Injects demographics list for the group
-    """
     outfit_mode = resolve_outfit_mode(kind, forced_mode)
     n = len(group_chars)
     names = [x.character for x in group_chars]
@@ -482,15 +371,13 @@ def assemble_group(
     pose_template = (assembled.get("Pose") or "").strip()
     assembled["Pose"] = ", ".join([p for p in [group_pose_hint(kind, n), pose_template] if p])
 
-    # Group stability defaults
     assembled["Body"] = "simple composition, clear spacing between characters"
     assembled["Hands"] = "simple cartoon hands, hands at sides or resting, five fingers per hand"
     assembled["Clothing"] = "modest clothing"
 
-    # Demographics list (one per character)
     assembled["Demographics"] = ", ".join([demographics_tags(x.age_group, x.gender) for x in group_chars])
+    assembled["Eye_Color_Tags"] = ", ".join([f"{x.character}, {eye_color_tags(x.eye_color)}" for x in group_chars])
 
-    # Clear remaining placeholders to prevent bracket text from leaking into output
     for sec, val in list(assembled.items()):
         if not isinstance(val, str):
             continue
@@ -506,11 +393,6 @@ def assemble_group(
 
 
 def render_prompt(assembled: Dict[str, str]) -> Tuple[str, str, str]:
-    """
-    Converts assembled section dictionary into:
-      main prompt string, negative prompt string, settings string
-    using a stable section order.
-    """
     def get(sec: str) -> str:
         return (assembled.get(sec) or "").strip()
 
@@ -518,6 +400,7 @@ def render_prompt(assembled: Dict[str, str]) -> Tuple[str, str, str]:
         "Header",
         "Character_Identity",
         "Demographics",
+        "Eye_Color_Tags",
         "Hair_Block_Placeholder",
         "Head_Structure",
         "Pose",
@@ -628,8 +511,43 @@ def main():
     os.makedirs(outdir, exist_ok=True)
 
     rows_all = read_characters_csv(char_csv)
-    rows = prompt_character_scope(rows_all)
+
+    print("\nCharacter selection (applies to ALL modes this run):")
+    print("  1) All characters")
+    print("  2) Select ONE character")
+    print("  3) Select MULTIPLE characters")
+    lookup_all = {r.character.lower(): r for r in rows_all}
+    while True:
+        s = input("Choose 1 / 2 / 3 [1]: ").strip()
+        if s == "" or s == "1":
+            rows = rows_all
+            break
+        if s == "2":
+            name = input("Enter character name (exact match): ").strip()
+            r = lookup_all.get(name.lower())
+            if not r:
+                raise ValueError(f"Not found in character CSV: {name}")
+            rows = [r]
+            break
+        if s == "3":
+            names = input("Enter character names (comma-separated): ").strip()
+            selected: List[CharacterRow] = []
+            missing: List[str] = []
+            for n in parse_list(names):
+                r = lookup_all.get(n.lower())
+                if r:
+                    selected.append(r)
+                else:
+                    missing.append(n)
+            if missing:
+                raise ValueError(f"Not found in character CSV: {missing}")
+            if not selected:
+                raise ValueError("No valid characters selected.")
+            rows = selected
+            break
+
     lookup = build_lookup(rows)
+    scope_names = ", ".join([r.character for r in rows])
 
     forced_mode = prompt_outfit_force()
 
@@ -638,8 +556,6 @@ def main():
         kind = template_kind_from_filename(tpath)
         items = read_template_csv(tpath)
         template_pack.append((kind, items, tpath))
-
-    scope_names = ", ".join([r.character for r in rows])
 
     combined_rows: List[Dict[str, str]] = []
     mode = prompt_choice()
@@ -708,7 +624,7 @@ def main():
                 "Negative_Prompt": neg_p,
                 "Settings": settings,
                 "Output_File": filename,
-                })
+            })
 
     def generate_random_groups() -> None:
         group_size = prompt_int("Random group size", 3, minv=2, maxv=10)
