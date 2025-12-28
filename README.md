@@ -274,15 +274,15 @@ characters to complex group scenes.
 
 A complete, production-grade prompt generator:
 
-Singles ✔
-Manual groups ✔
-Random groups ✔
-Generate everything ✔
-Pose auto-selection ✔
-Pose override ✔
-Height tiers ✔
-Bleed protection ✔
-Fully documented ✔
+- Singles ✔
+- Manual groups ✔
+- Random groups ✔
+- Generate everything ✔
+- Pose auto-selection ✔
+- Pose override ✔
+- Height tiers ✔
+- Bleed protection ✔
+- Fully documented ✔
 
 ================================================================================
 END OF FILE
