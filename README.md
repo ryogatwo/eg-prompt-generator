@@ -1,6 +1,6 @@
 
 # NOOB EG Prompt Builder – Full System Guide  using CyberRealistic Pony / Stability Matrix #
-V 1.5.0
+V 1.7.0
 
 Added eye color
 
