@@ -271,6 +271,19 @@ designed for reliability, safety, and show accuracy.
 Once configured, it requires no prompt tweaking and scales cleanly from single
 characters to complex group scenes.
 
+
+A complete, production-grade prompt generator:
+
+Singles ✔
+Manual groups ✔
+Random groups ✔
+Generate everything ✔
+Pose auto-selection ✔
+Pose override ✔
+Height tiers ✔
+Bleed protection ✔
+Fully documented ✔
+
 ================================================================================
 END OF FILE
 ================================================================================
