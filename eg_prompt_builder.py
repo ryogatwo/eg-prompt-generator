@@ -7,20 +7,17 @@ CyberRealistic Pony prompt assembler for singles + groups, CSV-driven.
 VERSIONING
 ===============================================================================
 Script Name: eg_prompt_builder.py
-Version:     1.5.0
+Version:     1.6.0
 Last Change: 2025-12-27
 
 Changelog
+- 1.6.0  Added Rainbooms band attire + Formal attire outfit blocks + outfit force menu support
 - 1.5.0  Added Eye_Color column support and auto-injection into prompts
 - 1.4.0  Added Demographics Injection (Age_Group + Gender) into prompts
 - 1.3.0  Added Explicit Character Selection (All / One / Multiple) for entire run
 - 1.2.0  Added Outfit Force Toggle (Auto / Casual / Pajamas / Camp Everfree)
 - 1.1.0  Added Group shots (manual + random) and "Generate everything"
 - 1.0.0  Initial CSV template-driven prompt builder
-
-If you change logic or CSV schema, bump Version and add a changelog line.
-===============================================================================
-
 
 ===============================================================================
 STEP-BY-STEP SETUP
@@ -29,30 +26,27 @@ STEP-BY-STEP SETUP
 STEP 1) Put these files in ONE folder
 - eg_prompt_builder.py
 - equestria_girls_reference.csv
-- ultra_minimal_bulletproof_eg_template_sleep.csv
-- ultra_minimal_bulletproof_eg_template_daytime.csv
-- ultra_minimal_bulletproof_eg_template_classroom.csv
-- ultra_minimal_bulletproof_eg_template_outdoor.csv
-- ultra_minimal_bulletproof_eg_template_winter.csv
-- optional: ultra_minimal_bulletproof_eg_template_camp_everfree.csv
+- template CSV files (Section,Content), for example:
+  - ultra_minimal_bulletproof_eg_template_sleep.csv
+  - ultra_minimal_bulletproof_eg_template_daytime.csv
+  - ultra_minimal_bulletproof_eg_template_classroom.csv
+  - ultra_minimal_bulletproof_eg_template_outdoor.csv
+  - ultra_minimal_bulletproof_eg_template_winter.csv
+  - ultra_minimal_bulletproof_eg_template_camp_everfree.csv (optional)
+  - ultra_minimal_bulletproof_eg_template_formal.csv (optional)
+  - ultra_minimal_bulletproof_eg_template_band.csv (optional)
 
 STEP 2) Confirm Python works
 - Python 3.9+ (3.10+ recommended)
 - No extra packages required (standard library only)
 
 STEP 3) Confirm Character CSV header is EXACT
-Character,Age_Group,Gender,Eye_Color,Hair_Block,Casual_Outfit_Block,Pajamas_Block,Camp_Everfree_Outfit_Block
+Character,Age_Group,Gender,Eye_Color,Hair_Block,Casual_Outfit_Block,Pajamas_Block,Camp_Everfree_Outfit_Block,Rainbooms_Band_Outfit_Block,Formal_Outfit_Block
 
 Allowed values:
 - Age_Group: child | teen | adult
 - Gender:    female | male
-- Eye_Color: simple color words like blue, green, purple, teal, amber, brown, etc.
-
-Notes:
-- Age/Gender/Eye color are injected automatically (no template placeholders needed).
-
-STEP 4) Confirm Template CSV header is EXACT
-Section,Content
+- Eye_Color: simple color words (blue, green, purple, teal, amber, brown, etc.)
 
 Template placeholders (optional):
 - [CHARACTER NAME]
@@ -60,9 +54,11 @@ Template placeholders (optional):
 - [PASTE CASUAL OUTFIT BLOCK HERE]
 - [PASTE PAJAMAS BLOCK HERE]
 - [PASTE CAMP EVERFREE OUTFIT BLOCK HERE]
+- [PASTE RAINBOOMS BAND OUTFIT BLOCK HERE]
+- [PASTE FORMAL OUTFIT BLOCK HERE]
 
-STEP 5) Run
-python eg_prompt_builder.py
+Notes:
+- Demographics + eye color are injected automatically, no placeholder required.
 
 ===============================================================================
 """
@@ -82,19 +78,23 @@ PLACEHOLDERS = {
     "casual": "[PASTE CASUAL OUTFIT BLOCK HERE]",
     "pajamas": "[PASTE PAJAMAS BLOCK HERE]",
     "camp": "[PASTE CAMP EVERFREE OUTFIT BLOCK HERE]",
+    "band": "[PASTE RAINBOOMS BAND OUTFIT BLOCK HERE]",
+    "formal": "[PASTE FORMAL OUTFIT BLOCK HERE]",
 }
 
 
 @dataclass
 class CharacterRow:
     character: str
-    age_group: str  # child / teen / adult
-    gender: str     # female / male
-    eye_color: str  # e.g. blue, green, purple, teal, amber, brown
+    age_group: str
+    gender: str
+    eye_color: str
     hair: str
     casual: str
     pajamas: str
     camp: str
+    band: str
+    formal: str
 
 
 # -----------------------------
@@ -112,6 +112,8 @@ def read_characters_csv(path: str) -> List[CharacterRow]:
             "Casual_Outfit_Block",
             "Pajamas_Block",
             "Camp_Everfree_Outfit_Block",
+            "Rainbooms_Band_Outfit_Block",
+            "Formal_Outfit_Block",
         }
         missing = required - set(reader.fieldnames or [])
         if missing:
@@ -131,6 +133,8 @@ def read_characters_csv(path: str) -> List[CharacterRow]:
                 casual=(r.get("Casual_Outfit_Block") or "").strip(),
                 pajamas=(r.get("Pajamas_Block") or "").strip(),
                 camp=(r.get("Camp_Everfree_Outfit_Block") or "").strip(),
+                band=(r.get("Rainbooms_Band_Outfit_Block") or "").strip(),
+                formal=(r.get("Formal_Outfit_Block") or "").strip(),
             ))
         return rows
 
@@ -163,6 +167,9 @@ def slugify(s: str) -> str:
 
 
 def template_kind_from_filename(path: str) -> str:
+    """
+    Infers template kind from filename for AUTO outfit mode.
+    """
     base = os.path.basename(path).lower()
     if "classroom" in base:
         return "classroom"
@@ -174,6 +181,10 @@ def template_kind_from_filename(path: str) -> str:
         return "winter"
     if "camp" in base or "everfree" in base:
         return "camp"
+    if "band" in base or "rainbooms" in base:
+        return "band"
+    if "formal" in base or "gala" in base:
+        return "formal"
     return "sleep"
 
 
@@ -230,13 +241,19 @@ def prompt_character_scope(rows_all: List[CharacterRow]) -> List[CharacterRow]:
 # Outfit mode toggle
 # -----------------------------
 def prompt_outfit_force() -> str:
+    """
+    Global outfit mode toggle for this run.
+    Returns: auto | casual | pajamas | camp | band | formal
+    """
     print("\nOutfit mode (applies to ALL outputs this run):")
-    print("  a) Auto (by template type: sleep=pajamas, camp=camp, else casual)")
+    print("  a) Auto (sleep=pajamas, camp=camp, band=band, formal=formal, else casual)")
     print("  c) Force Casual outfits")
     print("  p) Force Pajamas")
     print("  e) Force Camp Everfree attire")
+    print("  r) Force Rainbooms band attire")
+    print("  f) Force Formal attire")
     while True:
-        s = input("Choose a/c/p/e [a]: ").strip().lower()
+        s = input("Choose a/c/p/e/r/f [a]: ").strip().lower()
         if s == "" or s == "a":
             return "auto"
         if s == "c":
@@ -245,15 +262,24 @@ def prompt_outfit_force() -> str:
             return "pajamas"
         if s == "e":
             return "camp"
+        if s == "r":
+            return "band"
+        if s == "f":
+            return "formal"
 
 
 def resolve_outfit_mode(kind: str, forced_mode: str) -> str:
-    if forced_mode in ("casual", "pajamas", "camp"):
+    if forced_mode in ("casual", "pajamas", "camp", "band", "formal"):
         return forced_mode
+    # auto:
     if kind == "sleep":
         return "pajamas"
     if kind == "camp":
         return "camp"
+    if kind == "band":
+        return "band"
+    if kind == "formal":
+        return "formal"
     return "casual"
 
 
@@ -262,6 +288,10 @@ def outfit_block_for(c: CharacterRow, outfit_mode: str) -> str:
         return c.pajamas
     if outfit_mode == "camp":
         return c.camp
+    if outfit_mode == "band":
+        return c.band
+    if outfit_mode == "formal":
+        return c.formal
     return c.casual
 
 
@@ -294,10 +324,6 @@ def demographics_tags(age_group: str, gender: str) -> str:
 
 
 def eye_color_tags(eye_color: str) -> str:
-    """
-    Keep eye color tags simple and model-friendly.
-    Example: 'blue' -> 'blue eyes'
-    """
     c = (eye_color or "").strip().lower()
     if not c:
         return "eyes"
@@ -316,6 +342,10 @@ def group_pose_hint(kind: str, n: int) -> str:
         return f"group shot, {n} students, standing together, simple composition"
     if kind == "camp":
         return f"group shot, {n} students, camp everfree scene, simple composition"
+    if kind == "band":
+        return f"group shot, {n} students, band performance scene, simple composition"
+    if kind == "formal":
+        return f"group shot, {n} students, formal event scene, simple composition"
     return f"group shot, {n} students, standing together, simple composition"
 
 
@@ -338,6 +368,8 @@ def assemble_single(
         out = out.replace(PLACEHOLDERS["casual"], c.casual)
         out = out.replace(PLACEHOLDERS["pajamas"], c.pajamas)
         out = out.replace(PLACEHOLDERS["camp"], c.camp)
+        out = out.replace(PLACEHOLDERS["band"], c.band)
+        out = out.replace(PLACEHOLDERS["formal"], c.formal)
 
         if sec.lower() == "clothing" and not out.strip():
             out = outfit_block_for(c, outfit_mode)
@@ -387,6 +419,8 @@ def assemble_group(
                .replace(PLACEHOLDERS["casual"], "")
                .replace(PLACEHOLDERS["pajamas"], "")
                .replace(PLACEHOLDERS["camp"], "")
+               .replace(PLACEHOLDERS["band"], "")
+               .replace(PLACEHOLDERS["formal"], "")
         ).strip().strip(",")
 
     return assembled
@@ -496,8 +530,10 @@ def main():
         "ultra_minimal_bulletproof_eg_template_outdoor.csv",
         "ultra_minimal_bulletproof_eg_template_sleep.csv",
         "ultra_minimal_bulletproof_eg_template_winter.csv",
-        # Optional camp template:
+        # Optional additions:
         # "ultra_minimal_bulletproof_eg_template_camp_everfree.csv",
+        # "ultra_minimal_bulletproof_eg_template_band.csv",
+        # "ultra_minimal_bulletproof_eg_template_formal.csv",
     ]
 
     print("\nTemplate CSVs (comma or semicolon separated). Press Enter to use defaults:")
@@ -511,41 +547,7 @@ def main():
     os.makedirs(outdir, exist_ok=True)
 
     rows_all = read_characters_csv(char_csv)
-
-    print("\nCharacter selection (applies to ALL modes this run):")
-    print("  1) All characters")
-    print("  2) Select ONE character")
-    print("  3) Select MULTIPLE characters")
-    lookup_all = {r.character.lower(): r for r in rows_all}
-    while True:
-        s = input("Choose 1 / 2 / 3 [1]: ").strip()
-        if s == "" or s == "1":
-            rows = rows_all
-            break
-        if s == "2":
-            name = input("Enter character name (exact match): ").strip()
-            r = lookup_all.get(name.lower())
-            if not r:
-                raise ValueError(f"Not found in character CSV: {name}")
-            rows = [r]
-            break
-        if s == "3":
-            names = input("Enter character names (comma-separated): ").strip()
-            selected: List[CharacterRow] = []
-            missing: List[str] = []
-            for n in parse_list(names):
-                r = lookup_all.get(n.lower())
-                if r:
-                    selected.append(r)
-                else:
-                    missing.append(n)
-            if missing:
-                raise ValueError(f"Not found in character CSV: {missing}")
-            if not selected:
-                raise ValueError("No valid characters selected.")
-            rows = selected
-            break
-
+    rows = prompt_character_scope(rows_all)
     lookup = build_lookup(rows)
     scope_names = ", ".join([r.character for r in rows])
 
