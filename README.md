@@ -7,7 +7,7 @@ CyberRealistic Pony / Stability Matrix
 
 Version 1.10.0
 
-================================================================================
+
 OVERVIEW
 ================================================================================
 
@@ -34,7 +34,7 @@ It supports:
 
 No manual prompt editing is required.
 
-================================================================================
+
 REQUIRED FILES (ALL IN THE SAME FOLDER)
 ================================================================================
 
@@ -87,7 +87,6 @@ Camp_Everfree_Outfit_Block,
 Rainbooms_Band_Outfit_Block,
 Formal_Outfit_Block
 
---------------------------------------------------------------------------------
 ALLOWED VALUES
 --------------------------------------------------------------------------------
 
@@ -124,7 +123,7 @@ Hair_Block:
 Example:
 show accurate hair, (lavender hair:1.50), (white streaks:1.25), side part, curled ends
 
-================================================================================
+
 TEMPLATE CSV FORMAT
 ================================================================================
 
@@ -151,7 +150,6 @@ DO NOT ADD placeholders for:
 
 These are injected automatically.
 
-================================================================================
 HEIGHT SYSTEM (AUTOMATIC)
 ================================================================================
 
@@ -163,7 +161,7 @@ adult  -> average / tall
 
 Height is never stored in the CSV.
 
-================================================================================
+
 POSE SYSTEM
 ================================================================================
 
@@ -185,7 +183,6 @@ If AUTO is selected, pose is inferred from the template filename:
 - band templates -> performance pose
 - camp templates -> outdoor camp pose
 
-================================================================================
 NEGATIVE BLEED PROTECTION (AUTOMATIC)
 ================================================================================
 
@@ -204,7 +201,6 @@ The script automatically injects negatives to prevent:
 
 DO NOT add negative bleed protection manually to templates.
 
-================================================================================
 HOW TO RUN
 ================================================================================
 
@@ -217,7 +213,6 @@ Follow the interactive menus to select:
 - pose mode
 - group configuration
 
-================================================================================
 GENERATION MODES
 ================================================================================
 
@@ -236,7 +231,7 @@ GENERATION MODES
    - Optional manual group
    - Optional random groups
 
-================================================================================
+
 OUTPUTS
 ================================================================================
 
@@ -263,7 +258,6 @@ SAFETY GUARANTEES
 - Group prompts remain identity-safe
 - Suitable for public model sharing
 
-================================================================================
 SUMMARY
 ================================================================================
 
@@ -286,6 +280,5 @@ A complete, production-grade prompt generator:
 - Bleed protection ✔
 - Fully documented ✔
 
-================================================================================
 END OF FILE
 ================================================================================
