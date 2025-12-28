@@ -2,7 +2,9 @@
 # NOOB EG Prompt Builder – Full System Guide  using CyberRealistic Pony / Stability Matrix #
 
 EG PROMPT BUILDER
+
 CyberRealistic Pony / Stability Matrix
+
 Version 1.9.0
 
 ================================================================================
