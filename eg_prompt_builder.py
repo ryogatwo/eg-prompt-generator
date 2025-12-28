@@ -7,20 +7,14 @@ CyberRealistic Pony / Stability Matrix Prompt System
 VERSION
 ===============================================================================
 Script Name : eg_prompt_builder.py
-Version     : 1.8.1
+Version     : 1.9.0
 Updated     : 2025-12-27
 
 Changelog:
-- 1.8.1  Restored and expanded FULL setup documentation
-- 1.8.0  Height tiers, automatic negative bleed protection, pose picker
+- 1.9.0  Re-added full group modes + optional auto-pose per template
+- 1.8.1  Full setup documentation restored
+- 1.8.0  Height tiers, negative bleed protection, pose picker
 - 1.7.0  Skin tone + body type support
-- 1.6.0  Rainbooms + Formal outfits
-- 1.5.0  Eye color injection
-- 1.4.0  Age + gender demographics
-- 1.3.0  Explicit character scope selection
-- 1.2.0  Outfit force toggle
-- 1.1.0  Group shots and random groups
-- 1.0.0  Initial release
 
 ===============================================================================
 PURPOSE
@@ -270,6 +264,16 @@ POSE_OPTIONS = {
     "sleep": "sleeping pose, resting comfortably"
 }
 
+AUTO_POSE_BY_TEMPLATE = {
+    "sleep": "sleep",
+    "classroom": "classroom",
+    "band": "band",
+    "camp": "camp",
+    "outdoor": "standing",
+    "daytime": "standing",
+    "winter": "standing",
+}
+
 NEGATIVE_BLEED_BLOCK = (
     "duplicate characters, merged faces, shared facial features, "
     "hair color bleeding between characters, incorrect hair colors, "
@@ -309,8 +313,21 @@ def read_template_csv(path: str) -> List[Tuple[str, str]]:
         return [(r["Section"], r["Content"]) for r in reader]
 
 # =============================================================================
-# DERIVED ATTRIBUTES
+# HELPERS
 # =============================================================================
+
+def slugify(s: str) -> str:
+    return re.sub(r"[^\w]+", "_", s.lower()).strip("_")
+
+def template_kind_from_filename(path: str) -> str:
+    p = os.path.basename(path).lower()
+    for k in AUTO_POSE_BY_TEMPLATE:
+        if k in p:
+            return k
+    return "default"
+
+def demographics(c: CharacterRow) -> str:
+    return f"{c.age_group} {c.gender}"
 
 def height_tier(c: CharacterRow) -> str:
     if c.age_group == "child":
@@ -323,11 +340,8 @@ def height_tier(c: CharacterRow) -> str:
         return "tall height"
     return "average height"
 
-def demographics(c: CharacterRow) -> str:
-    return f"{c.age_group} {c.gender}"
-
 # =============================================================================
-# PROMPT ASSEMBLY
+# ASSEMBLY
 # =============================================================================
 
 def assemble_single(template, c, pose_key):
@@ -345,12 +359,27 @@ def assemble_single(template, c, pose_key):
     a["Negative"] = NEGATIVE_BLEED_BLOCK
     return a
 
+def assemble_group(template, chars, pose_key):
+    a = {}
+    names = ", ".join(c.character for c in chars)
+
+    for sec, txt in template:
+        a[sec] = txt.replace("[CHARACTER NAME]", names)
+
+    a["Demographics"] = ", ".join(demographics(c) for c in chars)
+    a["Body_Type"] = ", ".join(f"{c.character}, {c.body_type}" for c in chars)
+    a["Height"] = ", ".join(f"{c.character}, {height_tier(c)}" for c in chars)
+    a["Skin_Tone"] = ", ".join(f"{c.character}, skin tone, {c.skin_tone}" for c in chars)
+    a["Eye_Color"] = ", ".join(f"{c.character}, {c.eye_color} eyes" for c in chars)
+    a["Hair"] = ", ".join(f"{c.character}, {c.hair}" for c in chars)
+    a["Pose"] = POSE_OPTIONS[pose_key]
+    a["Negative"] = NEGATIVE_BLEED_BLOCK
+    return a
+
 def render_prompt(a):
-    main = []
-    for k in ["Demographics","Body_Type","Height","Skin_Tone","Eye_Color","Hair","Pose"]:
-        if a.get(k):
-            main.append(a[k])
-    return ", ".join(main), a.get("Negative","")
+    order = ["Demographics","Body_Type","Height","Skin_Tone","Eye_Color","Hair","Pose"]
+    main = ", ".join(a[k] for k in order if a.get(k))
+    return main, a.get("Negative","")
 
 # =============================================================================
 # INTERACTIVE
@@ -358,32 +387,70 @@ def render_prompt(a):
 
 def choose_pose():
     print("\nPose selection:")
+    print("  auto (template-aware)")
     for k in POSE_OPTIONS:
-        print(f"  {k}")
+        if k != "auto":
+            print(f"  {k}")
     s = input("Choose pose [auto]: ").strip().lower()
     return s if s in POSE_OPTIONS else "auto"
+
+def choose_mode():
+    print("\nGeneration mode:")
+    print("  1) Singles")
+    print("  2) Manual group")
+    print("  3) Random groups")
+    print("  4) Generate everything")
+    return input("Choose [1]: ").strip() or "1"
 
 # =============================================================================
 # MAIN
 # =============================================================================
 
 def main():
-    print("EG Prompt Builder v1.8.1")
+    print("EG Prompt Builder v1.9.0")
 
     chars = read_characters_csv("equestria_girls_reference.csv")
     template_file = input("Template CSV filename: ").strip()
-    templates = read_template_csv(template_file)
+    template = read_template_csv(template_file)
 
-    pose_key = choose_pose()
+    mode = choose_mode()
+    pose_choice = choose_pose()
+    kind = template_kind_from_filename(template_file)
+
+    if pose_choice == "auto":
+        pose_key = AUTO_POSE_BY_TEMPLATE.get(kind, "auto")
+    else:
+        pose_key = pose_choice
 
     outdir = "out_prompts"
     os.makedirs(outdir, exist_ok=True)
 
-    for c in chars:
-        a = assemble_single(templates, c, pose_key)
-        main, neg = render_prompt(a)
-        with open(os.path.join(outdir, f"{c.character}.txt"), "w", encoding="utf-8") as f:
+    def write_file(name, main, neg):
+        with open(os.path.join(outdir, name), "w", encoding="utf-8") as f:
             f.write("MAIN PROMPT:\n" + main + "\n\nNEGATIVE PROMPT:\n" + neg)
+
+    if mode in ("1","4"):
+        for c in chars:
+            a = assemble_single(template, c, pose_key)
+            main, neg = render_prompt(a)
+            write_file(f"{slugify(c.character)}.txt", main, neg)
+
+    if mode in ("2","4"):
+        names = input("Enter group names (comma separated): ").split(",")
+        group = [c for c in chars if c.character in [n.strip() for n in names]]
+        if len(group) >= 2:
+            a = assemble_group(template, group, pose_key)
+            main, neg = render_prompt(a)
+            write_file(f"group_manual.txt", main, neg)
+
+    if mode in ("3","4"):
+        size = int(input("Random group size [3]: ") or 3)
+        count = int(input("How many groups [5]: ") or 5)
+        for i in range(count):
+            group = random.sample(chars, size)
+            a = assemble_group(template, group, pose_key)
+            main, neg = render_prompt(a)
+            write_file(f"group_rand_{i+1}.txt", main, neg)
 
     print("Done.")
 
