@@ -4,7 +4,7 @@ V 1.9.0
 
 Added eye color
 
-(see comments in eg_prompt_builder.py for setup info)
+(see comments in eg_prompt_builder.py for setup info and up to date notes)
 
 This project generates stable, SFW, show-accurate Equestria Girls prompts using CSV-driven characters and templates.
 
