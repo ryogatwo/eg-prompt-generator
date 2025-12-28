@@ -1,65 +1,39 @@
 #!/usr/bin/env python3
 """
 EG Prompt Builder (Interactive)
-CyberRealistic Pony prompt assembler for singles + groups, CSV-driven.
+CyberRealistic Pony Prompt System
 
 ===============================================================================
-VERSIONING
+VERSION
 ===============================================================================
-Script Name: eg_prompt_builder.py
-Version:     1.6.0
-Last Change: 2025-12-27
+Version: 1.7.0
+Last Updated: 2025-12-27
 
-Changelog
-- 1.6.0  Added Rainbooms band attire + Formal attire outfit blocks + outfit force menu support
-- 1.5.0  Added Eye_Color column support and auto-injection into prompts
-- 1.4.0  Added Demographics Injection (Age_Group + Gender) into prompts
-- 1.3.0  Added Explicit Character Selection (All / One / Multiple) for entire run
-- 1.2.0  Added Outfit Force Toggle (Auto / Casual / Pajamas / Camp Everfree)
-- 1.1.0  Added Group shots (manual + random) and "Generate everything"
-- 1.0.0  Initial CSV template-driven prompt builder
+Changelog:
+- Added Skin_Tone + Body_Type support
+- Fully stabilized hair blocks
+- Expanded outfit modes: Casual, Pajamas, Camp Everfree, Rainbooms, Formal
+- Explicit character scope selection
+- Group-safe prompt assembly
+- No template placeholders required for new fields
 
 ===============================================================================
-STEP-BY-STEP SETUP
+SETUP (STEP BY STEP)
 ===============================================================================
+1) Place these files in ONE folder:
+   - eg_prompt_builder.py
+   - equestria_girls_reference.csv
+   - One or more template CSV files
 
-STEP 1) Put these files in ONE folder
-- eg_prompt_builder.py
-- equestria_girls_reference.csv
-- template CSV files (Section,Content), for example:
-  - ultra_minimal_bulletproof_eg_template_sleep.csv
-  - ultra_minimal_bulletproof_eg_template_daytime.csv
-  - ultra_minimal_bulletproof_eg_template_classroom.csv
-  - ultra_minimal_bulletproof_eg_template_outdoor.csv
-  - ultra_minimal_bulletproof_eg_template_winter.csv
-  - ultra_minimal_bulletproof_eg_template_camp_everfree.csv (optional)
-  - ultra_minimal_bulletproof_eg_template_formal.csv (optional)
-  - ultra_minimal_bulletproof_eg_template_band.csv (optional)
+2) Python 3.9+ required (standard library only)
 
-STEP 2) Confirm Python works
-- Python 3.9+ (3.10+ recommended)
-- No extra packages required (standard library only)
+3) Character CSV MUST include columns:
+   Character,Age_Group,Gender,Eye_Color,Skin_Tone,Body_Type,
+   Hair_Block,Casual_Outfit_Block,Pajamas_Block,
+   Camp_Everfree_Outfit_Block,Rainbooms_Band_Outfit_Block,Formal_Outfit_Block
 
-STEP 3) Confirm Character CSV header is EXACT
-Character,Age_Group,Gender,Eye_Color,Hair_Block,Casual_Outfit_Block,Pajamas_Block,Camp_Everfree_Outfit_Block,Rainbooms_Band_Outfit_Block,Formal_Outfit_Block
-
-Allowed values:
-- Age_Group: child | teen | adult
-- Gender:    female | male
-- Eye_Color: simple color words (blue, green, purple, teal, amber, brown, etc.)
-
-Template placeholders (optional):
-- [CHARACTER NAME]
-- [PASTE HAIR BLOCK HERE]
-- [PASTE CASUAL OUTFIT BLOCK HERE]
-- [PASTE PAJAMAS BLOCK HERE]
-- [PASTE CAMP EVERFREE OUTFIT BLOCK HERE]
-- [PASTE RAINBOOMS BAND OUTFIT BLOCK HERE]
-- [PASTE FORMAL OUTFIT BLOCK HERE]
-
-Notes:
-- Demographics + eye color are injected automatically, no placeholder required.
-
+4) Run:
+   python eg_prompt_builder.py
 ===============================================================================
 """
 
@@ -72,6 +46,10 @@ from dataclasses import dataclass
 from typing import Dict, List, Tuple
 
 
+# =============================================================================
+# CONSTANTS
+# =============================================================================
+
 PLACEHOLDERS = {
     "name": "[CHARACTER NAME]",
     "hair": "[PASTE HAIR BLOCK HERE]",
@@ -83,12 +61,18 @@ PLACEHOLDERS = {
 }
 
 
+# =============================================================================
+# DATA MODEL
+# =============================================================================
+
 @dataclass
 class CharacterRow:
     character: str
     age_group: str
     gender: str
     eye_color: str
+    skin_tone: str
+    body_type: str
     hair: str
     casual: str
     pajamas: str
@@ -97,20 +81,17 @@ class CharacterRow:
     formal: str
 
 
-# -----------------------------
-# CSV IO
-# -----------------------------
+# =============================================================================
+# CSV LOADING
+# =============================================================================
+
 def read_characters_csv(path: str) -> List[CharacterRow]:
-    with open(path, "r", newline="", encoding="utf-8") as f:
+    with open(path, "r", encoding="utf-8", newline="") as f:
         reader = csv.DictReader(f)
         required = {
-            "Character",
-            "Age_Group",
-            "Gender",
-            "Eye_Color",
-            "Hair_Block",
-            "Casual_Outfit_Block",
-            "Pajamas_Block",
+            "Character","Age_Group","Gender","Eye_Color",
+            "Skin_Tone","Body_Type",
+            "Hair_Block","Casual_Outfit_Block","Pajamas_Block",
             "Camp_Everfree_Outfit_Block",
             "Rainbooms_Band_Outfit_Block",
             "Formal_Outfit_Block",
@@ -119,159 +100,70 @@ def read_characters_csv(path: str) -> List[CharacterRow]:
         if missing:
             raise ValueError(f"Character CSV missing columns: {sorted(missing)}")
 
-        rows: List[CharacterRow] = []
+        rows = []
         for r in reader:
-            name = (r.get("Character") or "").strip()
-            if not name:
-                continue
             rows.append(CharacterRow(
-                character=name,
-                age_group=(r.get("Age_Group") or "").strip().lower(),
-                gender=(r.get("Gender") or "").strip().lower(),
-                eye_color=(r.get("Eye_Color") or "").strip().lower(),
-                hair=(r.get("Hair_Block") or "").strip(),
-                casual=(r.get("Casual_Outfit_Block") or "").strip(),
-                pajamas=(r.get("Pajamas_Block") or "").strip(),
-                camp=(r.get("Camp_Everfree_Outfit_Block") or "").strip(),
-                band=(r.get("Rainbooms_Band_Outfit_Block") or "").strip(),
-                formal=(r.get("Formal_Outfit_Block") or "").strip(),
+                character=r["Character"].strip(),
+                age_group=r["Age_Group"].strip().lower(),
+                gender=r["Gender"].strip().lower(),
+                eye_color=r["Eye_Color"].strip().lower(),
+                skin_tone=r["Skin_Tone"].strip().lower(),
+                body_type=r["Body_Type"].strip().lower(),
+                hair=r["Hair_Block"].strip(),
+                casual=r["Casual_Outfit_Block"].strip(),
+                pajamas=r["Pajamas_Block"].strip(),
+                camp=r["Camp_Everfree_Outfit_Block"].strip(),
+                band=r["Rainbooms_Band_Outfit_Block"].strip(),
+                formal=r["Formal_Outfit_Block"].strip(),
             ))
         return rows
 
 
 def read_template_csv(path: str) -> List[Tuple[str, str]]:
-    with open(path, "r", newline="", encoding="utf-8") as f:
+    with open(path, "r", encoding="utf-8", newline="") as f:
         reader = csv.DictReader(f)
-        required = {"Section", "Content"}
-        missing = required - set(reader.fieldnames or [])
-        if missing:
-            raise ValueError(f"Template CSV missing columns: {sorted(missing)}")
-
-        items: List[Tuple[str, str]] = []
-        for r in reader:
-            sec = (r.get("Section") or "").strip()
-            content = (r.get("Content") or "").strip()
-            if sec:
-                items.append((sec, content))
-        return items
+        if not {"Section","Content"} <= set(reader.fieldnames or []):
+            raise ValueError("Template CSV must contain Section,Content headers")
+        return [(r["Section"].strip(), r["Content"].strip()) for r in reader]
 
 
-# -----------------------------
-# Helpers
-# -----------------------------
+# =============================================================================
+# HELPERS
+# =============================================================================
+
 def slugify(s: str) -> str:
-    s = s.strip().lower()
-    s = re.sub(r"[^\w\s-]+", "", s)
-    s = re.sub(r"[\s_-]+", "_", s)
-    return s.strip("_") or "item"
+    return re.sub(r"[^\w]+", "_", s.lower()).strip("_")
 
 
 def template_kind_from_filename(path: str) -> str:
-    """
-    Infers template kind from filename for AUTO outfit mode.
-    """
-    base = os.path.basename(path).lower()
-    if "classroom" in base:
-        return "classroom"
-    if "daytime" in base:
-        return "daytime"
-    if "outdoor" in base:
-        return "outdoor"
-    if "winter" in base:
-        return "winter"
-    if "camp" in base or "everfree" in base:
-        return "camp"
-    if "band" in base or "rainbooms" in base:
-        return "band"
-    if "formal" in base or "gala" in base:
-        return "formal"
-    return "sleep"
+    name = os.path.basename(path).lower()
+    for k in ["sleep","camp","band","formal","winter","classroom","outdoor","daytime"]:
+        if k in name:
+            return k
+    return "default"
 
 
-def parse_list(s: str) -> List[str]:
-    parts = re.split(r"[;,]", s)
-    return [p.strip() for p in parts if p.strip()]
+def demographics(c: CharacterRow) -> str:
+    if c.age_group == "child":
+        return f"child {c.gender}"
+    if c.age_group == "teen":
+        return f"teen {c.gender}"
+    return f"adult {c.gender}"
 
 
-def build_lookup(rows: List[CharacterRow]) -> Dict[str, CharacterRow]:
-    return {r.character.lower(): r for r in rows}
+def outfit_block(c: CharacterRow, mode: str) -> str:
+    return {
+        "casual": c.casual,
+        "pajamas": c.pajamas,
+        "camp": c.camp,
+        "band": c.band,
+        "formal": c.formal,
+    }.get(mode, c.casual)
 
 
-# -----------------------------
-# Character scope selection
-# -----------------------------
-def prompt_character_scope(rows_all: List[CharacterRow]) -> List[CharacterRow]:
-    print("\nCharacter selection (applies to ALL modes this run):")
-    print("  1) All characters")
-    print("  2) Select ONE character")
-    print("  3) Select MULTIPLE characters")
-
-    lookup_all = {r.character.lower(): r for r in rows_all}
-
-    while True:
-        s = input("Choose 1 / 2 / 3 [1]: ").strip()
-        if s == "" or s == "1":
-            return rows_all
-
-        if s == "2":
-            name = input("Enter character name (exact match): ").strip()
-            r = lookup_all.get(name.lower())
-            if not r:
-                raise ValueError(f"Not found in character CSV: {name}")
-            return [r]
-
-        if s == "3":
-            names = input("Enter character names (comma-separated): ").strip()
-            selected: List[CharacterRow] = []
-            missing: List[str] = []
-            for n in parse_list(names):
-                r = lookup_all.get(n.lower())
-                if r:
-                    selected.append(r)
-                else:
-                    missing.append(n)
-            if missing:
-                raise ValueError(f"Not found in character CSV: {missing}")
-            if not selected:
-                raise ValueError("No valid characters selected.")
-            return selected
-
-
-# -----------------------------
-# Outfit mode toggle
-# -----------------------------
-def prompt_outfit_force() -> str:
-    """
-    Global outfit mode toggle for this run.
-    Returns: auto | casual | pajamas | camp | band | formal
-    """
-    print("\nOutfit mode (applies to ALL outputs this run):")
-    print("  a) Auto (sleep=pajamas, camp=camp, band=band, formal=formal, else casual)")
-    print("  c) Force Casual outfits")
-    print("  p) Force Pajamas")
-    print("  e) Force Camp Everfree attire")
-    print("  r) Force Rainbooms band attire")
-    print("  f) Force Formal attire")
-    while True:
-        s = input("Choose a/c/p/e/r/f [a]: ").strip().lower()
-        if s == "" or s == "a":
-            return "auto"
-        if s == "c":
-            return "casual"
-        if s == "p":
-            return "pajamas"
-        if s == "e":
-            return "camp"
-        if s == "r":
-            return "band"
-        if s == "f":
-            return "formal"
-
-
-def resolve_outfit_mode(kind: str, forced_mode: str) -> str:
-    if forced_mode in ("casual", "pajamas", "camp", "band", "formal"):
-        return forced_mode
-    # auto:
+def resolve_outfit(kind: str, forced: str) -> str:
+    if forced != "auto":
+        return forced
     if kind == "sleep":
         return "pajamas"
     if kind == "camp":
@@ -283,429 +175,102 @@ def resolve_outfit_mode(kind: str, forced_mode: str) -> str:
     return "casual"
 
 
-def outfit_block_for(c: CharacterRow, outfit_mode: str) -> str:
-    if outfit_mode == "pajamas":
-        return c.pajamas
-    if outfit_mode == "camp":
-        return c.camp
-    if outfit_mode == "band":
-        return c.band
-    if outfit_mode == "formal":
-        return c.formal
-    return c.casual
+# =============================================================================
+# ASSEMBLY
+# =============================================================================
 
+def assemble_single(template, c, kind, forced):
+    mode = resolve_outfit(kind, forced)
+    assembled = {}
 
-# -----------------------------
-# Demographics + eye color injection
-# -----------------------------
-def demographics_tags(age_group: str, gender: str) -> str:
-    age_group = (age_group or "").strip().lower()
-    gender = (gender or "").strip().lower()
+    for sec, txt in template:
+        txt = txt.replace(PLACEHOLDERS["name"], c.character)
+        txt = txt.replace(PLACEHOLDERS["hair"], c.hair)
+        txt = txt.replace(PLACEHOLDERS["casual"], c.casual)
+        txt = txt.replace(PLACEHOLDERS["pajamas"], c.pajamas)
+        txt = txt.replace(PLACEHOLDERS["camp"], c.camp)
+        txt = txt.replace(PLACEHOLDERS["band"], c.band)
+        txt = txt.replace(PLACEHOLDERS["formal"], c.formal)
+        assembled[sec] = txt
 
-    age_map = {"child": "child", "teen": "teen", "adult": "adult"}
-    gender_map = {"female": "female", "male": "male"}
-
-    age = age_map.get(age_group, age_group or "teen")
-    gen = gender_map.get(gender, gender or "female")
-
-    if age == "teen" and gen == "female":
-        return "teen girl, female"
-    if age == "teen" and gen == "male":
-        return "teen boy, male"
-    if age == "child" and gen == "female":
-        return "child girl, female"
-    if age == "child" and gen == "male":
-        return "child boy, male"
-    if age == "adult" and gen == "female":
-        return "adult woman, female"
-    if age == "adult" and gen == "male":
-        return "adult man, male"
-    return f"{age}, {gen}"
-
-
-def eye_color_tags(eye_color: str) -> str:
-    c = (eye_color or "").strip().lower()
-    if not c:
-        return "eyes"
-    return f"{c} eyes"
-
-
-# -----------------------------
-# Group pose helper
-# -----------------------------
-def group_pose_hint(kind: str, n: int) -> str:
-    if kind == "classroom":
-        return f"group shot, {n} students, sitting at desks, simple composition"
-    if kind == "sleep":
-        return f"group shot, {n} students, sleepover scene, simple composition"
-    if kind == "winter":
-        return f"group shot, {n} students, standing together, simple composition"
-    if kind == "camp":
-        return f"group shot, {n} students, camp everfree scene, simple composition"
-    if kind == "band":
-        return f"group shot, {n} students, band performance scene, simple composition"
-    if kind == "formal":
-        return f"group shot, {n} students, formal event scene, simple composition"
-    return f"group shot, {n} students, standing together, simple composition"
-
-
-# -----------------------------
-# Assembly
-# -----------------------------
-def assemble_single(
-    template_items: List[Tuple[str, str]],
-    c: CharacterRow,
-    kind: str,
-    forced_mode: str,
-) -> Dict[str, str]:
-    outfit_mode = resolve_outfit_mode(kind, forced_mode)
-    assembled: Dict[str, str] = {}
-
-    for sec, content in template_items:
-        out = content
-        out = out.replace(PLACEHOLDERS["name"], c.character)
-        out = out.replace(PLACEHOLDERS["hair"], c.hair)
-        out = out.replace(PLACEHOLDERS["casual"], c.casual)
-        out = out.replace(PLACEHOLDERS["pajamas"], c.pajamas)
-        out = out.replace(PLACEHOLDERS["camp"], c.camp)
-        out = out.replace(PLACEHOLDERS["band"], c.band)
-        out = out.replace(PLACEHOLDERS["formal"], c.formal)
-
-        if sec.lower() == "clothing" and not out.strip():
-            out = outfit_block_for(c, outfit_mode)
-
-        assembled[sec] = out
-
-    assembled["Demographics"] = demographics_tags(c.age_group, c.gender)
-    assembled["Eye_Color_Tags"] = eye_color_tags(c.eye_color)
-    return assembled
-
-
-def assemble_group(
-    template_items: List[Tuple[str, str]],
-    group_chars: List[CharacterRow],
-    kind: str,
-    forced_mode: str,
-) -> Dict[str, str]:
-    outfit_mode = resolve_outfit_mode(kind, forced_mode)
-    n = len(group_chars)
-    names = [x.character for x in group_chars]
-
-    assembled: Dict[str, str] = {sec: content for sec, content in template_items}
-    assembled["Character_Identity"] = ", ".join(names) + ", equestria girls, group of students"
-
-    parts: List[str] = []
-    for c in group_chars:
-        outfit = outfit_block_for(c, outfit_mode)
-        parts.append(", ".join([c.character, c.hair.rstrip(","), outfit.rstrip(",")]))
-    assembled["Hair_Block_Placeholder"] = ", ".join(parts)
-
-    pose_template = (assembled.get("Pose") or "").strip()
-    assembled["Pose"] = ", ".join([p for p in [group_pose_hint(kind, n), pose_template] if p])
-
-    assembled["Body"] = "simple composition, clear spacing between characters"
-    assembled["Hands"] = "simple cartoon hands, hands at sides or resting, five fingers per hand"
-    assembled["Clothing"] = "modest clothing"
-
-    assembled["Demographics"] = ", ".join([demographics_tags(x.age_group, x.gender) for x in group_chars])
-    assembled["Eye_Color_Tags"] = ", ".join([f"{x.character}, {eye_color_tags(x.eye_color)}" for x in group_chars])
-
-    for sec, val in list(assembled.items()):
-        if not isinstance(val, str):
-            continue
-        assembled[sec] = (
-            val.replace(PLACEHOLDERS["name"], " and ".join(names))
-               .replace(PLACEHOLDERS["hair"], "")
-               .replace(PLACEHOLDERS["casual"], "")
-               .replace(PLACEHOLDERS["pajamas"], "")
-               .replace(PLACEHOLDERS["camp"], "")
-               .replace(PLACEHOLDERS["band"], "")
-               .replace(PLACEHOLDERS["formal"], "")
-        ).strip().strip(",")
+    assembled["Demographics"] = demographics(c)
+    assembled["Body_Type"] = c.body_type
+    assembled["Skin_Tone"] = f"skin tone, {c.skin_tone}"
+    assembled["Eye_Color"] = f"{c.eye_color} eyes"
 
     return assembled
 
 
-def render_prompt(assembled: Dict[str, str]) -> Tuple[str, str, str]:
-    def get(sec: str) -> str:
-        return (assembled.get(sec) or "").strip()
+def assemble_group(template, chars, kind, forced):
+    mode = resolve_outfit(kind, forced)
+    assembled = {}
 
-    main_order = [
-        "Header",
-        "Character_Identity",
-        "Demographics",
-        "Eye_Color_Tags",
-        "Hair_Block_Placeholder",
-        "Head_Structure",
-        "Pose",
-        "Body",
-        "Hands",
-        "Clothing",
-        "Camp_Everfree_Clothing_Block",
-        "Art_Style",
-        "Environment",
-        "Lighting",
-        "Background_Element",
-        "Mood",
-    ]
-    main_parts = [get(s).rstrip(",") for s in main_order if get(s)]
-    main_prompt = ", ".join([p for p in main_parts if p])
+    for sec, txt in template:
+        assembled[sec] = txt.replace(PLACEHOLDERS["name"], " and ".join(c.character for c in chars))
 
-    neg_parts: List[str] = []
-    if get("Negative_Prompt_Header"):
-        neg_parts.append(get("Negative_Prompt_Header").rstrip(","))
-    for sec in ["Negative_Content_1", "Negative_Content_2", "Negative_Content_3", "Negative_Content_4", "Negative_Content_5"]:
-        if get(sec):
-            neg_parts.append(get(sec).rstrip(","))
-    neg_prompt = ", ".join([p for p in neg_parts if p])
+    assembled["Character_Identity"] = ", ".join(c.character for c in chars)
+    assembled["Hair_Block"] = ", ".join(f"{c.character}, {c.hair}" for c in chars)
+    assembled["Demographics"] = ", ".join(demographics(c) for c in chars)
+    assembled["Body_Type"] = ", ".join(f"{c.character}, {c.body_type}" for c in chars)
+    assembled["Skin_Tone"] = ", ".join(f"{c.character}, skin tone, {c.skin_tone}" for c in chars)
+    assembled["Eye_Color"] = ", ".join(f"{c.character}, {c.eye_color} eyes" for c in chars)
+    assembled["Clothing"] = ", ".join(outfit_block(c, mode) for c in chars)
 
-    settings_lines: List[str] = []
-    for sec in ["Recommended_CFG", "Recommended_Steps", "Recommended_Sampler", "Recommended_Resolution"]:
-        if get(sec):
-            settings_lines.append(f"{sec.replace('Recommended_', '')}: {get(sec)}")
-    settings = "\n".join(settings_lines)
-
-    return main_prompt, neg_prompt, settings
+    return assembled
 
 
-# -----------------------------
-# Interactive prompts
-# -----------------------------
-def prompt_path(label: str, default: str) -> str:
-    s = input(f"{label} [{default}]: ").strip()
-    return s or default
+def render_prompt(a):
+    main = []
+    neg = []
+    settings = []
+
+    for k in [
+        "Character_Identity","Demographics","Body_Type","Skin_Tone","Eye_Color",
+        "Hair_Block","Clothing","Pose","Environment","Lighting","Mood"
+    ]:
+        if a.get(k):
+            main.append(a[k].strip(", "))
+
+    for k in a:
+        if k.startswith("Negative"):
+            neg.append(a[k])
+
+    for k in a:
+        if k.startswith("Recommended"):
+            settings.append(f"{k}: {a[k]}")
+
+    return ", ".join(main), ", ".join(neg), "\n".join(settings)
 
 
-def prompt_int(label: str, default: int, minv: int = 0, maxv: int = 10_000) -> int:
-    s = input(f"{label} [{default}]: ").strip()
-    if not s:
-        return default
-    try:
-        v = int(s)
-    except ValueError:
-        return default
-    return max(minv, min(maxv, v))
+# =============================================================================
+# MAIN
+# =============================================================================
 
-
-def prompt_yes_no(label: str, default_yes: bool = True) -> bool:
-    default = "Y/n" if default_yes else "y/N"
-    s = input(f"{label} ({default}): ").strip().lower()
-    if not s:
-        return default_yes
-    return s in {"y", "yes"}
-
-
-def prompt_choice() -> str:
-    print("\nChoose mode:")
-    print("  1) Single-character prompts (ALL characters in-scope x ALL templates)")
-    print("  2) Manual group prompts (YOUR chosen group x ALL templates)")
-    print("  3) Random group prompts (N groups x ALL templates, drawn from in-scope)")
-    print("  4) Generate everything (singles + optional manual group + random groups)")
-    while True:
-        s = input("Enter 1, 2, 3, or 4: ").strip()
-        if s in {"1", "2", "3", "4"}:
-            return s
-
-
-def write_txt(outdir: str, filename: str, main_p: str, neg_p: str, settings: str) -> None:
-    with open(os.path.join(outdir, filename), "w", encoding="utf-8") as f:
-        f.write("MAIN PROMPT:\n" + main_p + "\n\nNEGATIVE PROMPT:\n" + neg_p)
-        if settings:
-            f.write("\n\nSETTINGS:\n" + settings + "\n")
-        else:
-            f.write("\n")
-
-
-# -----------------------------
-# Main
-# -----------------------------
 def main():
-    print("EG Prompt Builder (Interactive)")
+    print("EG Prompt Builder v1.7.0")
 
-    char_csv = prompt_path("Character CSV", "equestria_girls_reference.csv")
+    char_csv = input("Character CSV [equestria_girls_reference.csv]: ").strip() or "equestria_girls_reference.csv"
+    templates = input("Template CSVs (comma separated): ").split(",")
+    outdir = input("Output folder [out_prompts]: ").strip() or "out_prompts"
 
-    default_templates = [
-        "ultra_minimal_bulletproof_eg_template_classroom.csv",
-        "ultra_minimal_bulletproof_eg_template_daytime.csv",
-        "ultra_minimal_bulletproof_eg_template_outdoor.csv",
-        "ultra_minimal_bulletproof_eg_template_sleep.csv",
-        "ultra_minimal_bulletproof_eg_template_winter.csv",
-        # Optional additions:
-        # "ultra_minimal_bulletproof_eg_template_camp_everfree.csv",
-        # "ultra_minimal_bulletproof_eg_template_band.csv",
-        # "ultra_minimal_bulletproof_eg_template_formal.csv",
-    ]
-
-    print("\nTemplate CSVs (comma or semicolon separated). Press Enter to use defaults:")
-    for t in default_templates:
-        print(f"  - {t}")
-    t_in = input("Templates: ").strip()
-    templates = parse_list(t_in) if t_in else default_templates
-
-    outdir = prompt_path("Output folder", "out_prompts")
-    combined_csv_name = prompt_path("Combined CSV filename", "assembled_prompts.csv")
     os.makedirs(outdir, exist_ok=True)
 
-    rows_all = read_characters_csv(char_csv)
-    rows = prompt_character_scope(rows_all)
-    lookup = build_lookup(rows)
-    scope_names = ", ".join([r.character for r in rows])
+    chars = read_characters_csv(char_csv)
 
-    forced_mode = prompt_outfit_force()
+    print("\nOutfit mode: auto, casual, pajamas, camp, band, formal")
+    forced = input("Choose [auto]: ").strip() or "auto"
 
-    template_pack: List[Tuple[str, List[Tuple[str, str]], str]] = []
-    for tpath in templates:
-        kind = template_kind_from_filename(tpath)
-        items = read_template_csv(tpath)
-        template_pack.append((kind, items, tpath))
+    template_sets = [(template_kind_from_filename(t), read_template_csv(t.strip()), t.strip()) for t in templates if t.strip()]
 
-    combined_rows: List[Dict[str, str]] = []
-    mode = prompt_choice()
+    for c in chars:
+        for kind, tmpl, name in template_sets:
+            assembled = assemble_single(tmpl, c, kind, forced)
+            main, neg, settings = render_prompt(assembled)
+            fname = f"{slugify(c.character)}__{kind}.txt"
+            with open(os.path.join(outdir, fname), "w", encoding="utf-8") as f:
+                f.write(main)
 
-    def generate_singles() -> None:
-        for c in rows:
-            for kind, items, tpath in template_pack:
-                assembled = assemble_single(items, c, kind, forced_mode)
-                main_p, neg_p, settings = render_prompt(assembled)
-
-                filename = f"{slugify(c.character)}__{kind}.txt"
-                write_txt(outdir, filename, main_p, neg_p, settings)
-
-                combined_rows.append({
-                    "Mode": "single",
-                    "Character_Scope": scope_names,
-                    "Forced_Outfit_Mode": forced_mode,
-                    "Resolved_Outfit_Mode": resolve_outfit_mode(kind, forced_mode),
-                    "Group_Name": "",
-                    "Character": c.character,
-                    "Template_Kind": kind,
-                    "Template_File": os.path.basename(tpath),
-                    "Main_Prompt": main_p,
-                    "Negative_Prompt": neg_p,
-                    "Settings": settings,
-                    "Output_File": filename,
-                })
-
-    def generate_manual_group() -> None:
-        print("\nEnter group character names separated by commas (must match Character column).")
-        print("Note: manual group names must be IN-SCOPE for this run.")
-        group_str = input("Group: ").strip()
-        names = parse_list(group_str)
-        if len(names) < 2:
-            raise ValueError("Manual group requires at least 2 characters.")
-
-        group_chars: List[CharacterRow] = []
-        missing: List[str] = []
-        for n in names:
-            r = lookup.get(n.lower())
-            if r:
-                group_chars.append(r)
-            else:
-                missing.append(n)
-        if missing:
-            raise ValueError(f"Not found in selected character scope: {missing}")
-
-        for kind, items, tpath in template_pack:
-            assembled = assemble_group(items, group_chars, kind, forced_mode)
-            main_p, neg_p, settings = render_prompt(assembled)
-
-            group_slug = slugify("_".join([c.character for c in group_chars])[:120])
-            filename = f"group__{kind}__{group_slug}.txt"
-            write_txt(outdir, filename, main_p, neg_p, settings)
-
-            combined_rows.append({
-                "Mode": "group_manual",
-                "Character_Scope": scope_names,
-                "Forced_Outfit_Mode": forced_mode,
-                "Resolved_Outfit_Mode": resolve_outfit_mode(kind, forced_mode),
-                "Group_Name": ", ".join([c.character for c in group_chars]),
-                "Character": "",
-                "Template_Kind": kind,
-                "Template_File": os.path.basename(tpath),
-                "Main_Prompt": main_p,
-                "Negative_Prompt": neg_p,
-                "Settings": settings,
-                "Output_File": filename,
-            })
-
-    def generate_random_groups() -> None:
-        group_size = prompt_int("Random group size", 3, minv=2, maxv=10)
-        num_groups = prompt_int("How many random groups", 10, minv=1, maxv=10_000)
-        seed = prompt_int("Random seed (0 = random each run)", 123, minv=0, maxv=2_147_483_647)
-        if seed != 0:
-            random.seed(seed)
-
-        pool = rows
-        if len(pool) < group_size:
-            raise ValueError("Not enough characters in the selected scope for the requested group size.")
-
-        for gi in range(1, num_groups + 1):
-            group_chars = random.sample(pool, group_size)
-            for kind, items, tpath in template_pack:
-                assembled = assemble_group(items, group_chars, kind, forced_mode)
-                main_p, neg_p, settings = render_prompt(assembled)
-
-                group_slug = slugify("_".join([c.character for c in group_chars])[:120])
-                filename = f"group_rand{gi:03d}__{kind}__{group_slug}.txt"
-                write_txt(outdir, filename, main_p, neg_p, settings)
-
-                combined_rows.append({
-                    "Mode": "group_random",
-                    "Character_Scope": scope_names,
-                    "Forced_Outfit_Mode": forced_mode,
-                    "Resolved_Outfit_Mode": resolve_outfit_mode(kind, forced_mode),
-                    "Group_Name": ", ".join([c.character for c in group_chars]),
-                    "Character": "",
-                    "Template_Kind": kind,
-                    "Template_File": os.path.basename(tpath),
-                    "Main_Prompt": main_p,
-                    "Negative_Prompt": neg_p,
-                    "Settings": settings,
-                    "Output_File": filename,
-                })
-
-    if mode == "1":
-        generate_singles()
-    elif mode == "2":
-        generate_manual_group()
-    elif mode == "3":
-        generate_random_groups()
-    else:
-        print("\nGenerating ALL single-character prompts for selected scope...")
-        generate_singles()
-        print("Singles done.")
-
-        if prompt_yes_no("Also generate a manual group?", default_yes=False):
-            generate_manual_group()
-
-        if prompt_yes_no("Also generate random groups?", default_yes=True):
-            generate_random_groups()
-
-    combined_path = os.path.join(outdir, combined_csv_name)
-    fieldnames = [
-        "Mode",
-        "Character_Scope",
-        "Forced_Outfit_Mode",
-        "Resolved_Outfit_Mode",
-        "Group_Name",
-        "Character",
-        "Template_Kind",
-        "Template_File",
-        "Main_Prompt",
-        "Negative_Prompt",
-        "Settings",
-        "Output_File",
-    ]
-    with open(combined_path, "w", newline="", encoding="utf-8") as f:
-        w = csv.DictWriter(f, fieldnames=fieldnames)
-        w.writeheader()
-        w.writerows(combined_rows)
-
-    print("\nDone.")
-    print(f"Character scope: {scope_names}")
-    print(f"Forced outfit mode: {forced_mode}")
-    print(f"Output folder: {outdir}")
-    print(f"Combined CSV:  {combined_path}")
+    print("Done.")
 
 
 if __name__ == "__main__":
