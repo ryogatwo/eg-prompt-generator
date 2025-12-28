@@ -54,7 +54,7 @@ OPTIONAL TEMPLATES:
 - ultra_minimal_bulletproof_eg_template_band.csv
 - ultra_minimal_bulletproof_eg_template_formal.csv
 
-================================================================================
+
 PYTHON REQUIREMENTS
 ================================================================================
 
@@ -65,7 +65,7 @@ PYTHON REQUIREMENTS
 Check Python version:
 python --version
 
-================================================================================
+
 CHARACTER CSV FORMAT (CRITICAL)
 ================================================================================
 
@@ -247,7 +247,6 @@ These files are ready for:
 - Automatic1111
 - ComfyUI
 
-================================================================================
 SAFETY GUARANTEES
 ================================================================================
 
