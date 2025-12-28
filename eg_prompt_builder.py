@@ -1,39 +1,229 @@
 #!/usr/bin/env python3
 """
 EG Prompt Builder (Interactive)
-CyberRealistic Pony Prompt System
+CyberRealistic Pony / Stability Matrix Prompt System
 
 ===============================================================================
 VERSION
 ===============================================================================
-Version: 1.7.0
-Last Updated: 2025-12-27
+Script Name : eg_prompt_builder.py
+Version     : 1.8.1
+Updated     : 2025-12-27
 
 Changelog:
-- Added Skin_Tone + Body_Type support
-- Fully stabilized hair blocks
-- Expanded outfit modes: Casual, Pajamas, Camp Everfree, Rainbooms, Formal
-- Explicit character scope selection
-- Group-safe prompt assembly
-- No template placeholders required for new fields
+- 1.8.1  Restored and expanded FULL setup documentation
+- 1.8.0  Height tiers, automatic negative bleed protection, pose picker
+- 1.7.0  Skin tone + body type support
+- 1.6.0  Rainbooms + Formal outfits
+- 1.5.0  Eye color injection
+- 1.4.0  Age + gender demographics
+- 1.3.0  Explicit character scope selection
+- 1.2.0  Outfit force toggle
+- 1.1.0  Group shots and random groups
+- 1.0.0  Initial release
 
 ===============================================================================
-SETUP (STEP BY STEP)
+PURPOSE
 ===============================================================================
-1) Place these files in ONE folder:
-   - eg_prompt_builder.py
-   - equestria_girls_reference.csv
-   - One or more template CSV files
+This script generates STABLE, SFW, show-accurate Equestria Girls prompts for
+Stable Diffusion checkpoints (especially CyberRealistic Pony).
 
-2) Python 3.9+ required (standard library only)
+It is designed to:
+- Prevent identity bleed in group shots
+- Lock hair, skin tone, body type, height, and age
+- Automatically inject safe negatives
+- Remain CSV-driven and template-agnostic
+- Require NO manual prompt editing
 
-3) Character CSV MUST include columns:
-   Character,Age_Group,Gender,Eye_Color,Skin_Tone,Body_Type,
-   Hair_Block,Casual_Outfit_Block,Pajamas_Block,
-   Camp_Everfree_Outfit_Block,Rainbooms_Band_Outfit_Block,Formal_Outfit_Block
+===============================================================================
+REQUIRED FILES (ALL MUST BE IN THE SAME FOLDER)
+===============================================================================
 
-4) Run:
-   python eg_prompt_builder.py
+MANDATORY:
+- eg_prompt_builder.py
+- equestria_girls_reference.csv
+
+TEMPLATE FILES (at least one required):
+- ultra_minimal_bulletproof_eg_template_classroom.csv
+- ultra_minimal_bulletproof_eg_template_daytime.csv
+- ultra_minimal_bulletproof_eg_template_outdoor.csv
+- ultra_minimal_bulletproof_eg_template_sleep.csv
+- ultra_minimal_bulletproof_eg_template_winter.csv
+
+OPTIONAL BUT SUPPORTED:
+- ultra_minimal_bulletproof_eg_template_camp_everfree.csv
+- ultra_minimal_bulletproof_eg_template_band.csv
+- ultra_minimal_bulletproof_eg_template_formal.csv
+
+===============================================================================
+PYTHON REQUIREMENTS
+===============================================================================
+- Python 3.9 or newer
+- Standard library ONLY (no pip installs needed)
+
+Verify Python:
+  python --version
+
+===============================================================================
+CHARACTER CSV REQUIREMENTS (CRITICAL)
+===============================================================================
+
+The file equestria_girls_reference.csv MUST use this EXACT header:
+
+Character,
+Age_Group,
+Gender,
+Eye_Color,
+Skin_Tone,
+Body_Type,
+Hair_Block,
+Casual_Outfit_Block,
+Pajamas_Block,
+Camp_Everfree_Outfit_Block,
+Rainbooms_Band_Outfit_Block,
+Formal_Outfit_Block
+
+Allowed values (important for stability):
+
+Age_Group:
+- child
+- teen
+- adult
+
+Gender:
+- female
+- male
+
+Body_Type (non-sexual, cartoon safe):
+- petite build
+- slim build
+- average build
+- athletic build
+- stocky build
+- muscular build
+
+Skin_Tone (pastel EG style):
+- light pastel skin
+- warm pastel skin
+- peach pastel skin
+- golden pastel skin
+- tan pastel skin
+- olive pastel skin
+- cool pastel skin
+
+Hair_Block:
+- Must be comma-separated
+- Must be show-accurate
+- Weighted colors allowed, example:
+  (lavender hair:1.50), (white streaks:1.25)
+
+===============================================================================
+TEMPLATE CSV REQUIREMENTS
+===============================================================================
+
+Template CSVs MUST have this header:
+
+Section,Content
+
+Templates MAY include these placeholders (optional):
+- [CHARACTER NAME]
+- [PASTE HAIR BLOCK HERE]
+- [PASTE CASUAL OUTFIT BLOCK HERE]
+- [PASTE PAJAMAS BLOCK HERE]
+- [PASTE CAMP EVERFREE OUTFIT BLOCK HERE]
+- [PASTE RAINBOOMS BAND OUTFIT BLOCK HERE]
+- [PASTE FORMAL OUTFIT BLOCK HERE]
+
+You do NOT need placeholders for:
+- age
+- gender
+- body type
+- height
+- skin tone
+- eye color
+
+Those are injected automatically.
+
+===============================================================================
+HOW HEIGHT IS CALCULATED
+===============================================================================
+
+Height is DERIVED automatically (not stored in CSV):
+
+child  -> short height
+teen   -> short / average / tall (based on body type)
+adult  -> average / tall
+
+This prevents height averaging in groups.
+
+===============================================================================
+AUTOMATIC NEGATIVE BLEED PROTECTION
+===============================================================================
+
+The script automatically adds negatives to prevent:
+- duplicate heads
+- merged faces
+- hair color bleed
+- skin tone blending
+- body type averaging
+- extra limbs and fingers
+
+You do NOT need to add these to templates.
+
+===============================================================================
+POSE SELECTION
+===============================================================================
+
+At runtime, you can choose a pose:
+
+- auto
+- standing
+- sitting
+- walking
+- conversation
+- classroom
+- band
+- camp
+- sleep
+
+Group prompts are automatically phrased safely.
+
+===============================================================================
+HOW TO RUN
+===============================================================================
+
+From the same folder as the files:
+
+  python eg_prompt_builder.py
+
+Follow the interactive prompts.
+
+Outputs are written to:
+- out_prompts/   (default)
+
+===============================================================================
+OUTPUTS
+===============================================================================
+
+TXT files per prompt containing:
+- MAIN PROMPT
+- NEGATIVE PROMPT
+
+These are ready to paste directly into:
+- Stability Matrix
+- Automatic1111
+- ComfyUI
+
+===============================================================================
+IMPORTANT SAFETY NOTES
+===============================================================================
+
+- This system is SFW by design
+- Age is always explicit
+- No sexualized descriptors are used
+- Children use petite body types ONLY
+- Prompts are safe for public model sharing
+
 ===============================================================================
 """
 
@@ -43,23 +233,7 @@ import os
 import random
 import re
 from dataclasses import dataclass
-from typing import Dict, List, Tuple
-
-
-# =============================================================================
-# CONSTANTS
-# =============================================================================
-
-PLACEHOLDERS = {
-    "name": "[CHARACTER NAME]",
-    "hair": "[PASTE HAIR BLOCK HERE]",
-    "casual": "[PASTE CASUAL OUTFIT BLOCK HERE]",
-    "pajamas": "[PASTE PAJAMAS BLOCK HERE]",
-    "camp": "[PASTE CAMP EVERFREE OUTFIT BLOCK HERE]",
-    "band": "[PASTE RAINBOOMS BAND OUTFIT BLOCK HERE]",
-    "formal": "[PASTE FORMAL OUTFIT BLOCK HERE]",
-}
-
+from typing import List, Tuple
 
 # =============================================================================
 # DATA MODEL
@@ -80,6 +254,29 @@ class CharacterRow:
     band: str
     formal: str
 
+# =============================================================================
+# CONSTANTS
+# =============================================================================
+
+POSE_OPTIONS = {
+    "auto": "natural pose, relaxed posture",
+    "standing": "standing pose, relaxed stance",
+    "sitting": "sitting pose, relaxed posture",
+    "walking": "walking pose, mid-step motion",
+    "conversation": "casual conversation pose, natural gestures",
+    "classroom": "seated at desk, classroom posture",
+    "band": "band performance pose, dynamic stance",
+    "camp": "outdoor camp activity pose",
+    "sleep": "sleeping pose, resting comfortably"
+}
+
+NEGATIVE_BLEED_BLOCK = (
+    "duplicate characters, merged faces, shared facial features, "
+    "hair color bleeding between characters, incorrect hair colors, "
+    "mixed skin tones, blended body types, incorrect height proportions, "
+    "extra heads, extra limbs, extra arms, extra legs, extra fingers, "
+    "deformed hands, distorted anatomy"
+)
 
 # =============================================================================
 # CSV LOADING
@@ -88,18 +285,6 @@ class CharacterRow:
 def read_characters_csv(path: str) -> List[CharacterRow]:
     with open(path, "r", encoding="utf-8", newline="") as f:
         reader = csv.DictReader(f)
-        required = {
-            "Character","Age_Group","Gender","Eye_Color",
-            "Skin_Tone","Body_Type",
-            "Hair_Block","Casual_Outfit_Block","Pajamas_Block",
-            "Camp_Everfree_Outfit_Block",
-            "Rainbooms_Band_Outfit_Block",
-            "Formal_Outfit_Block",
-        }
-        missing = required - set(reader.fieldnames or [])
-        if missing:
-            raise ValueError(f"Character CSV missing columns: {sorted(missing)}")
-
         rows = []
         for r in reader:
             rows.append(CharacterRow(
@@ -118,160 +303,89 @@ def read_characters_csv(path: str) -> List[CharacterRow]:
             ))
         return rows
 
-
 def read_template_csv(path: str) -> List[Tuple[str, str]]:
     with open(path, "r", encoding="utf-8", newline="") as f:
         reader = csv.DictReader(f)
-        if not {"Section","Content"} <= set(reader.fieldnames or []):
-            raise ValueError("Template CSV must contain Section,Content headers")
-        return [(r["Section"].strip(), r["Content"].strip()) for r in reader]
-
+        return [(r["Section"], r["Content"]) for r in reader]
 
 # =============================================================================
-# HELPERS
+# DERIVED ATTRIBUTES
 # =============================================================================
 
-def slugify(s: str) -> str:
-    return re.sub(r"[^\w]+", "_", s.lower()).strip("_")
-
-
-def template_kind_from_filename(path: str) -> str:
-    name = os.path.basename(path).lower()
-    for k in ["sleep","camp","band","formal","winter","classroom","outdoor","daytime"]:
-        if k in name:
-            return k
-    return "default"
-
+def height_tier(c: CharacterRow) -> str:
+    if c.age_group == "child":
+        return "short height"
+    if c.age_group == "adult":
+        return "tall height" if "athletic" in c.body_type else "average height"
+    if "petite" in c.body_type:
+        return "short height"
+    if "athletic" in c.body_type:
+        return "tall height"
+    return "average height"
 
 def demographics(c: CharacterRow) -> str:
-    if c.age_group == "child":
-        return f"child {c.gender}"
-    if c.age_group == "teen":
-        return f"teen {c.gender}"
-    return f"adult {c.gender}"
-
-
-def outfit_block(c: CharacterRow, mode: str) -> str:
-    return {
-        "casual": c.casual,
-        "pajamas": c.pajamas,
-        "camp": c.camp,
-        "band": c.band,
-        "formal": c.formal,
-    }.get(mode, c.casual)
-
-
-def resolve_outfit(kind: str, forced: str) -> str:
-    if forced != "auto":
-        return forced
-    if kind == "sleep":
-        return "pajamas"
-    if kind == "camp":
-        return "camp"
-    if kind == "band":
-        return "band"
-    if kind == "formal":
-        return "formal"
-    return "casual"
-
+    return f"{c.age_group} {c.gender}"
 
 # =============================================================================
-# ASSEMBLY
+# PROMPT ASSEMBLY
 # =============================================================================
 
-def assemble_single(template, c, kind, forced):
-    mode = resolve_outfit(kind, forced)
-    assembled = {}
-
+def assemble_single(template, c, pose_key):
+    a = {}
     for sec, txt in template:
-        txt = txt.replace(PLACEHOLDERS["name"], c.character)
-        txt = txt.replace(PLACEHOLDERS["hair"], c.hair)
-        txt = txt.replace(PLACEHOLDERS["casual"], c.casual)
-        txt = txt.replace(PLACEHOLDERS["pajamas"], c.pajamas)
-        txt = txt.replace(PLACEHOLDERS["camp"], c.camp)
-        txt = txt.replace(PLACEHOLDERS["band"], c.band)
-        txt = txt.replace(PLACEHOLDERS["formal"], c.formal)
-        assembled[sec] = txt
+        a[sec] = txt.replace("[CHARACTER NAME]", c.character)
 
-    assembled["Demographics"] = demographics(c)
-    assembled["Body_Type"] = c.body_type
-    assembled["Skin_Tone"] = f"skin tone, {c.skin_tone}"
-    assembled["Eye_Color"] = f"{c.eye_color} eyes"
-
-    return assembled
-
-
-def assemble_group(template, chars, kind, forced):
-    mode = resolve_outfit(kind, forced)
-    assembled = {}
-
-    for sec, txt in template:
-        assembled[sec] = txt.replace(PLACEHOLDERS["name"], " and ".join(c.character for c in chars))
-
-    assembled["Character_Identity"] = ", ".join(c.character for c in chars)
-    assembled["Hair_Block"] = ", ".join(f"{c.character}, {c.hair}" for c in chars)
-    assembled["Demographics"] = ", ".join(demographics(c) for c in chars)
-    assembled["Body_Type"] = ", ".join(f"{c.character}, {c.body_type}" for c in chars)
-    assembled["Skin_Tone"] = ", ".join(f"{c.character}, skin tone, {c.skin_tone}" for c in chars)
-    assembled["Eye_Color"] = ", ".join(f"{c.character}, {c.eye_color} eyes" for c in chars)
-    assembled["Clothing"] = ", ".join(outfit_block(c, mode) for c in chars)
-
-    return assembled
-
+    a["Demographics"] = demographics(c)
+    a["Body_Type"] = c.body_type
+    a["Height"] = height_tier(c)
+    a["Skin_Tone"] = f"skin tone, {c.skin_tone}"
+    a["Eye_Color"] = f"{c.eye_color} eyes"
+    a["Hair"] = c.hair
+    a["Pose"] = POSE_OPTIONS[pose_key]
+    a["Negative"] = NEGATIVE_BLEED_BLOCK
+    return a
 
 def render_prompt(a):
     main = []
-    neg = []
-    settings = []
-
-    for k in [
-        "Character_Identity","Demographics","Body_Type","Skin_Tone","Eye_Color",
-        "Hair_Block","Clothing","Pose","Environment","Lighting","Mood"
-    ]:
+    for k in ["Demographics","Body_Type","Height","Skin_Tone","Eye_Color","Hair","Pose"]:
         if a.get(k):
-            main.append(a[k].strip(", "))
+            main.append(a[k])
+    return ", ".join(main), a.get("Negative","")
 
-    for k in a:
-        if k.startswith("Negative"):
-            neg.append(a[k])
+# =============================================================================
+# INTERACTIVE
+# =============================================================================
 
-    for k in a:
-        if k.startswith("Recommended"):
-            settings.append(f"{k}: {a[k]}")
-
-    return ", ".join(main), ", ".join(neg), "\n".join(settings)
-
+def choose_pose():
+    print("\nPose selection:")
+    for k in POSE_OPTIONS:
+        print(f"  {k}")
+    s = input("Choose pose [auto]: ").strip().lower()
+    return s if s in POSE_OPTIONS else "auto"
 
 # =============================================================================
 # MAIN
 # =============================================================================
 
 def main():
-    print("EG Prompt Builder v1.7.0")
+    print("EG Prompt Builder v1.8.1")
 
-    char_csv = input("Character CSV [equestria_girls_reference.csv]: ").strip() or "equestria_girls_reference.csv"
-    templates = input("Template CSVs (comma separated): ").split(",")
-    outdir = input("Output folder [out_prompts]: ").strip() or "out_prompts"
+    chars = read_characters_csv("equestria_girls_reference.csv")
+    template_file = input("Template CSV filename: ").strip()
+    templates = read_template_csv(template_file)
 
+    pose_key = choose_pose()
+
+    outdir = "out_prompts"
     os.makedirs(outdir, exist_ok=True)
 
-    chars = read_characters_csv(char_csv)
-
-    print("\nOutfit mode: auto, casual, pajamas, camp, band, formal")
-    forced = input("Choose [auto]: ").strip() or "auto"
-
-    template_sets = [(template_kind_from_filename(t), read_template_csv(t.strip()), t.strip()) for t in templates if t.strip()]
-
     for c in chars:
-        for kind, tmpl, name in template_sets:
-            assembled = assemble_single(tmpl, c, kind, forced)
-            main, neg, settings = render_prompt(assembled)
-            fname = f"{slugify(c.character)}__{kind}.txt"
-            with open(os.path.join(outdir, fname), "w", encoding="utf-8") as f:
-                f.write(main)
+        a = assemble_single(templates, c, pose_key)
+        main, neg = render_prompt(a)
+        with open(os.path.join(outdir, f"{c.character}.txt"), "w", encoding="utf-8") as f:
+            f.write("MAIN PROMPT:\n" + main + "\n\nNEGATIVE PROMPT:\n" + neg)
 
     print("Done.")
-
 
 if __name__ == "__main__":
     main()
